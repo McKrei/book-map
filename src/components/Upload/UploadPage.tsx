@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { parseFB2 } from '../../lib/fb2Parser';
 import { analyzeBook, isAIConfigured } from '../../lib/aiService';
 import { buildMapFromAnalysis } from '../../lib/mapBuilder';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useBookStore } from '../../store/bookStore';
 import type { ParsedFB2 } from '../../types';
 
@@ -71,7 +71,7 @@ export function UploadPage() {
 
       if (isSupabaseConfigured()) {
         try {
-          const { data, error: dbError } = await supabase
+          const { data, error: dbError } = await getSupabase()
             .from('books')
             .insert({ title: book.title, author: book.author })
             .select()
@@ -204,6 +204,7 @@ export function UploadPage() {
 }
 
 async function saveAnalysisToDb(bookId: string, analysis: import('../../types').AIAnalysisResult) {
+  const supabase = getSupabase();
   for (const chapter of analysis.chapters) {
     const { data: chapterData } = await supabase
       .from('chapters')

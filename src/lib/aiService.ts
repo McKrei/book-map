@@ -90,7 +90,7 @@ export async function analyzeBook(
       'X-Title': 'BookMap',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.0-flash-001',
+      model: 'openai/gpt-4.1-mini',
       messages: [
         {
           role: 'user',

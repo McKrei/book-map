@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useBookStore } from '../../store/bookStore';
 
 export function BookList() {
@@ -8,7 +8,7 @@ export function BookList() {
 
   useEffect(() => {
     if (isSupabaseConfigured()) {
-      supabase
+      getSupabase()
         .from('books')
         .select('*')
         .order('created_at', { ascending: false })
