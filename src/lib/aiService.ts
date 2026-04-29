@@ -3,7 +3,11 @@ import type { ParsedFB2, AIAnalysisResult } from '../types';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 function getApiKey(): string {
-  return import.meta.env.VITE_OPENROUTER_API_KEY || '';
+  return localStorage.getItem('openrouter_api_key') || import.meta.env.VITE_OPENROUTER_API_KEY || '';
+}
+
+export function setApiKey(key: string): void {
+  localStorage.setItem('openrouter_api_key', key);
 }
 
 export function isAIConfigured(): boolean {
