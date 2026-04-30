@@ -91,7 +91,7 @@ export function buildMapFromAnalysis(analysis: AIAnalysisResult): MapData {
         source: `chapter-${chapterIdx - 1}`,
         target: chapterNodeId,
         type: 'smoothstep',
-        style: { stroke: '#6366f1', strokeWidth: 2, opacity: 0.6 },
+        style: { stroke: '#6366f1', strokeWidth: 2, opacity: 0 },
         animated: true,
       });
     }
@@ -134,7 +134,7 @@ export function buildMapFromAnalysis(analysis: AIAnalysisResult): MapData {
           source: `event-${chapterIdx}-${eventIdx - 1}`,
           target: eventNodeId,
           type: 'smoothstep',
-          style: { stroke: '#6366f1', strokeWidth: 1, opacity: 0.2, strokeDasharray: '4 4' },
+          style: { stroke: '#6366f1', strokeWidth: 1, opacity: 0, strokeDasharray: '4 4' },
         });
       }
 
@@ -148,7 +148,7 @@ export function buildMapFromAnalysis(analysis: AIAnalysisResult): MapData {
             source: charNodeId,
             target: eventNodeId,
             type: 'smoothstep',
-            style: { stroke: charColor, strokeWidth: 1.5, opacity: 0.25 },
+            style: { stroke: charColor, strokeWidth: 1.5, opacity: 0 },
             data: { characterSource: charNodeId },
           });
         }

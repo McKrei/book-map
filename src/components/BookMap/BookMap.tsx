@@ -53,7 +53,7 @@ export function BookMap({ initialNodes, initialEdges, bookTitle }: BookMapProps)
         if (edge.source === node.id || edge.target === node.id) {
           return { ...edge, style: { ...edge.style, opacity: 1, strokeWidth: 3 }, animated: true };
         }
-        return { ...edge, style: { ...edge.style, opacity: 0.06 } };
+        return { ...edge, style: { ...edge.style, opacity: 0 } };
       })
     );
 
@@ -77,14 +77,13 @@ export function BookMap({ initialNodes, initialEdges, bookTitle }: BookMapProps)
     setEdges((eds) =>
       eds.map((edge) => {
         const edgeData = edge.data as Record<string, unknown> | undefined;
-        const originalOpacity = edgeData?.characterSource ? 0.35 : undefined;
         return {
           ...edge,
-          animated: edge.id.startsWith('ch-edge-'),
+          animated: false,
           style: {
             ...edge.style,
-            opacity: originalOpacity ?? undefined,
-            strokeWidth: edgeData?.characterSource ? 1.5 : (edge.id.startsWith('ch-edge-') ? 3 : 2),
+            opacity: 0,
+            strokeWidth: edgeData?.characterSource ? 1.5 : (edge.id.startsWith('ch-edge-') ? 2 : 1),
           },
         };
       })
