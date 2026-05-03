@@ -1,17 +1,8 @@
 import type { ParsedFB2, AIAnalysisResult } from '../types';
-
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-function getApiKey(): string {
-  return localStorage.getItem('openrouter_api_key') || import.meta.env.VITE_OPENROUTER_API_KEY || '';
-}
-
-export function setApiKey(key: string): void {
-  localStorage.setItem('openrouter_api_key', key);
-}
+import { callGeminiJson, getProModel, isGeminiConfigured } from './geminiClient';
 
 export function isAIConfigured(): boolean {
-  return Boolean(getApiKey());
+  return isGeminiConfigured();
 }
 
 const COLORS = [
@@ -78,54 +69,19 @@ export async function analyzeBook(
   book: ParsedFB2,
   onProgress?: (message: string) => void,
 ): Promise<AIAnalysisResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not configured. Add VITE_OPENROUTER_API_KEY to your .env file.');
+  if (!isGeminiConfigured()) {
+    throw new Error(
+      'Gemini API key is not configured. Add VITE_GEMINI_API_KEY to your .env file or set it in Settings.',
+    );
   }
 
-  onProgress?.('Отправляю книгу на анализ...');
+  onProgress?.('Отправляю книгу на анализ через Gemini...');
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'BookMap',
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-4.1-mini',
-      messages: [
-        {
-          role: 'user',
-          content: buildPrompt(book),
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 16000,
-    }),
+  const result = await callGeminiJson<AIAnalysisResult>(getProModel(), buildPrompt(book), {
+    temperature: 0.3,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error('Empty response from AI');
-  }
-
   onProgress?.('Обрабатываю результаты анализа...');
-
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Could not extract JSON from AI response');
-  }
-
-  const result: AIAnalysisResult = JSON.parse(jsonMatch[0]);
 
   if (!result.characters || !result.chapters) {
     throw new Error('Invalid AI response structure');

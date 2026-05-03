@@ -7,7 +7,7 @@
 ## Возможности
 
 - 📖 **Загрузка FB2** — парсинг книг в формате FB2 (XML)
-- 🤖 **AI-анализ** — автоматическое выделение персонажей, событий и сюжетных линий через OpenRouter
+- 🤖 **AI-анализ** — автоматическое выделение персонажей, событий и сюжетных линий через Gemini 3.1
 - 🗺️ **Интерактивная карта** — зум, перемещение, перетаскивание блоков (как в Miro)
 - 👤 **Персонажи** — карточки с описанием и цветовой кодировкой
 - ⚡ **События** — последовательность ключевых сюжетных событий по главам
@@ -36,7 +36,6 @@ cp .env.example .env
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_OPENROUTER_API_KEY=your-openrouter-api-key
 VITE_GEMINI_API_KEY=your-google-ai-studio-key
 ```
 
@@ -49,11 +48,12 @@ VITE_GEMINI_API_KEY=your-google-ai-studio-key
 3. Выполните скрипт из `supabase/migrations/001_initial_schema.sql`
 4. Скопируйте URL и Anon Key из Settings → API
 
-### 4. Получение OpenRouter API ключа
+### 4. Получение Gemini API ключа
 
-1. Зарегистрируйтесь на [openrouter.ai](https://openrouter.ai)
-2. Создайте API ключ в разделе Keys
-3. Добавьте ключ в `.env`
+1. Откройте [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2. Создайте API ключ
+3. Для моделей `gemini-3.1-pro-preview` и `gemini-3.1-flash-tts-preview` нужен включённый billing на Google Cloud-проекте. Без billing работают `gemini-3-flash-preview` и `gemini-3.1-flash-lite-preview` — переключиться можно в Settings.
+4. Добавьте ключ в `.env` или в Settings приложения
 
 ### 5. Запуск
 
