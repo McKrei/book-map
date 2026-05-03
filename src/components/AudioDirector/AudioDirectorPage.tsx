@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Mic, Sparkles, AlertCircle, ArrowLeft, Settings, Save, RefreshCw } from 'lucide-react';
+import { Mic, Sparkles, AlertCircle, ArrowLeft, Settings, Save, RefreshCw, BookMarked } from 'lucide-react';
 import { getParsedBook, getCasting, saveCasting } from '../../lib/db';
 import { extractCharacters, mergeCasting } from '../../lib/audioDirector';
 import { isGeminiConfigured, isGeminiQuotaError, isGeminiAuthError } from '../../lib/geminiClient';
 import { useAudioStore } from '../../store/audioStore';
 import { CastingTable } from './CastingTable';
+import { AnalysisPipeline } from '../Pipeline/AnalysisPipeline';
+import { CASTING_EXTRACTION_STAGES } from '../Pipeline/stagePresets';
 import type { BookCasting } from '../../types/audio';
 import type { ParsedFB2 } from '../../types';
 
@@ -94,7 +96,9 @@ export function AudioDirectorPage() {
       const extracted = await extractCharacters(parsedBook, {
         onProgress: (msg) => setExtracting(true, msg),
         signal: abortRef.current.signal,
+        bookId,
       });
+      setExtracting(true, 'Подбираю голоса персонажам...');
       const merged: BookCasting = mergeCasting(bookId, casting, extracted);
       setCasting(merged);
       await saveCasting(merged);
@@ -178,7 +182,7 @@ export function AudioDirectorPage() {
             Audio Director
           </h1>
         </div>
-        <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
           {parsedBook ? (
             <>
               <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -192,6 +196,24 @@ export function AudioDirectorPage() {
             'Загружаю книгу...'
           )}
         </p>
+
+        {casting?.series && (
+          <div
+            className="inline-flex items-center gap-2 mb-6 rounded-full px-3 py-1.5 text-[12px]"
+            style={{
+              background: 'rgba(167, 139, 250, 0.12)',
+              border: '1px solid rgba(167, 139, 250, 0.3)',
+              color: 'var(--neon-purple)',
+            }}
+            title={`Уверенность: ${casting.series.confidence || 'medium'}`}
+          >
+            <BookMarked size={12} />
+            <span>
+              Серия: <strong>{casting.series.name}</strong>
+              {casting.series.index !== undefined && <> · #{casting.series.index}</>}
+            </span>
+          </div>
+        )}
 
         {bookMissing && (
           <div
@@ -259,14 +281,11 @@ export function AudioDirectorPage() {
         )}
 
         {isExtracting && (
-          <div
-            className="rounded-2xl p-6 flex items-center gap-3 mb-6"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-          >
-            <div className="w-5 h-5 border-2 border-[var(--neon-cyan)]/30 border-t-[var(--neon-cyan)] rounded-full animate-spin" />
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {extractMessage || 'Работаю...'}
-            </p>
+          <div className="mb-6">
+            <AnalysisPipeline
+              stages={CASTING_EXTRACTION_STAGES}
+              message={extractMessage || 'Работаю...'}
+            />
           </div>
         )}
 

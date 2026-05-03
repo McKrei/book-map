@@ -4,6 +4,7 @@ import type {
   CharacterCasting,
   ExtractedCharacter,
   ExtractedCharacters,
+  SeriesInfo,
 } from '../types/audio';
 import { callGeminiJson, getProModel } from './geminiClient';
 import { extractCharactersPrompt } from './audioPrompts';
@@ -13,43 +14,91 @@ import {
   colorForIndex,
   suggestVoice,
 } from './voicePresets';
+import { findSeriesContext } from './seriesPriors';
+import { updateParsedBookSeries } from './db';
 
 export interface ExtractCharactersOptions {
   onProgress?: (msg: string) => void;
   signal?: AbortSignal;
   model?: string;
+  bookId?: string;
 }
 
-function isExtractedCharacters(value: unknown): value is ExtractedCharacters {
+const TONES = [
+  'youthful',
+  'mature',
+  'elderly',
+  'child',
+  'intimidating',
+  'warm',
+  'authoritative',
+  'neutral',
+] as const;
+
+function isExtractedCharacter(c: unknown): c is ExtractedCharacter {
+  return (
+    typeof c === 'object' &&
+    c !== null &&
+    typeof (c as ExtractedCharacter).name === 'string' &&
+    typeof (c as ExtractedCharacter).description === 'string'
+  );
+}
+
+function isExtractedCharactersShape(value: unknown): value is { characters: ExtractedCharacter[] } {
   if (!value || typeof value !== 'object') return false;
   const v = value as { characters?: unknown };
-  if (!Array.isArray(v.characters)) return false;
-  return v.characters.every(
-    (c): c is ExtractedCharacter =>
-      typeof c === 'object' &&
-      c !== null &&
-      typeof (c as ExtractedCharacter).name === 'string' &&
-      typeof (c as ExtractedCharacter).description === 'string',
-  );
+  return Array.isArray(v.characters) && v.characters.every(isExtractedCharacter);
+}
+
+function parseSeries(value: unknown): SeriesInfo | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Partial<SeriesInfo>;
+  if (!v.name || typeof v.name !== 'string' || !v.name.trim()) return undefined;
+  return {
+    name: v.name.trim(),
+    index: typeof v.index === 'number' ? v.index : undefined,
+    confidence:
+      v.confidence === 'high' || v.confidence === 'medium' || v.confidence === 'low'
+        ? v.confidence
+        : undefined,
+  };
 }
 
 export async function extractCharacters(
   book: ParsedFB2,
   options: ExtractCharactersOptions = {},
 ): Promise<ExtractedCharacters> {
-  const { onProgress, signal, model } = options;
+  const { onProgress, signal, model, bookId } = options;
   const targetModel = model || getProModel();
+
+  let priors: Awaited<ReturnType<typeof findSeriesContext>> = { candidateBooks: [], priors: [] };
+  if (bookId) {
+    onProgress?.('Ищу книги той же серии в локальной базе...');
+    try {
+      priors = await findSeriesContext(bookId);
+      if (priors.priors.length > 0) {
+        onProgress?.(
+          `Нашёл ${priors.priors.length} известных персонажей из ${priors.candidateBooks.length} книг`,
+        );
+      }
+    } catch (e) {
+      console.warn('series priors lookup failed', e);
+    }
+  }
 
   onProgress?.(`Отправляю книгу на анализ через ${targetModel}...`);
 
-  const prompt = extractCharactersPrompt(book);
+  const prompt = extractCharactersPrompt(book, {
+    priors: priors.priors,
+    candidateSeriesBooks: priors.candidateBooks,
+  });
   const raw = await callGeminiJson<unknown>(targetModel, prompt, { signal });
 
-  if (!isExtractedCharacters(raw)) {
+  if (!isExtractedCharactersShape(raw)) {
     throw new Error('Gemini вернул невалидную структуру для списка персонажей');
   }
 
-  onProgress?.(`Получено персонажей: ${raw.characters.length}`);
+  const series = parseSeries((raw as { series?: unknown }).series);
 
   const sanitized = raw.characters
     .filter((c) => Boolean(c.name?.trim()))
@@ -62,22 +111,21 @@ export async function extractCharacters(
         c.suggestedGender === 'female' || c.suggestedGender === 'male'
           ? c.suggestedGender
           : 'neutral',
-      suggestedTone:
-        ([
-          'youthful',
-          'mature',
-          'elderly',
-          'child',
-          'intimidating',
-          'warm',
-          'authoritative',
-          'neutral',
-        ] as const).includes(c.suggestedTone)
-          ? c.suggestedTone
-          : 'neutral',
+      suggestedTone: TONES.includes(c.suggestedTone) ? c.suggestedTone : 'neutral',
+      styleHint: typeof c.styleHint === 'string' ? c.styleHint.trim() : '',
     }));
 
-  return { characters: sanitized };
+  onProgress?.(`Получено персонажей: ${sanitized.length}`);
+
+  if (bookId && series) {
+    try {
+      await updateParsedBookSeries(bookId, series);
+    } catch (e) {
+      console.warn('failed to persist series info', e);
+    }
+  }
+
+  return { characters: sanitized, series };
 }
 
 export function buildDefaultCasting(
@@ -103,8 +151,9 @@ export function buildDefaultCasting(
       name: char.name,
       description: char.description,
       isMain: char.isMain,
-      voice: { voiceId, styleHint: '' },
+      voice: { voiceId, styleHint: char.styleHint || '' },
       color: colorForIndex(idx + 1),
+      suggestedGender: char.suggestedGender,
     };
   });
 
@@ -121,6 +170,7 @@ export function buildDefaultCasting(
       styleHint: 'Спокойный, выразительный голос рассказчика аудиокниги.',
     },
     characters,
+    series: extracted.series,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -143,6 +193,11 @@ export function mergeCasting(
         ...prev,
         description: char.description || prev.description,
         isMain: char.isMain || prev.isMain,
+        suggestedGender: char.suggestedGender || prev.suggestedGender,
+        voice: {
+          voiceId: prev.voice.voiceId,
+          styleHint: prev.voice.styleHint || char.styleHint || '',
+        },
       };
     }
     const voiceId = suggestVoice({
@@ -155,8 +210,9 @@ export function mergeCasting(
       name: char.name,
       description: char.description,
       isMain: char.isMain,
-      voice: { voiceId, styleHint: '' },
+      voice: { voiceId, styleHint: char.styleHint || '' },
       color: colorForIndex(existing.characters.length + idx + 1),
+      suggestedGender: char.suggestedGender,
     };
   });
 
@@ -166,6 +222,7 @@ export function mergeCasting(
     bookId,
     narrator: existing.narrator,
     characters: [...merged, ...orphans],
+    series: extracted.series || existing.series,
     updatedAt: new Date().toISOString(),
   };
 }
