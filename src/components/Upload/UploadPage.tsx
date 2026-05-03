@@ -7,6 +7,8 @@ import { buildMapFromAnalysis } from '../../lib/mapBuilder';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { saveBook as saveBookToDb, saveParsedBook } from '../../lib/db';
 import { useBookStore } from '../../store/bookStore';
+import { AnalysisPipeline } from '../Pipeline/AnalysisPipeline';
+import { BOOK_ANALYSIS_STAGES } from '../Pipeline/stagePresets';
 import type { ParsedFB2, AIAnalysisResult } from '../../types';
 
 export function UploadPage() {
@@ -202,40 +204,32 @@ export function UploadPage() {
               ))}
             </div>
 
-            <button
-              onClick={handleAnalyze}
-              disabled={isLoading || !isAIConfigured()}
-              className="w-full font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                background: isLoading ? 'var(--bg-secondary)' : 'linear-gradient(135deg, var(--neon-purple), var(--neon-blue))',
-                color: '#fff',
-                boxShadow: isLoading ? 'none' : 'var(--glow-purple)',
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>{loadingMessage}</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  Анализировать книгу
-                </>
-              )}
-            </button>
+            {isLoading ? (
+              <AnalysisPipeline stages={BOOK_ANALYSIS_STAGES} message={loadingMessage} />
+            ) : (
+              <button
+                onClick={handleAnalyze}
+                disabled={!isAIConfigured()}
+                className="w-full font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neon-purple), var(--neon-blue))',
+                  color: '#fff',
+                  boxShadow: 'var(--glow-purple)',
+                }}
+              >
+                <Sparkles size={16} />
+                Анализировать книгу
+              </button>
+            )}
           </div>
         )}
 
         {isLoading && !parsedBook && (
-          <div className="mt-8 text-center">
-            <div
-              className="inline-flex items-center gap-3 neon-border rounded-xl px-6 py-4"
-              style={{ background: 'var(--bg-card)' }}
-            >
-              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--neon-purple)', borderTopColor: 'transparent' }} />
-              <span style={{ color: 'var(--text-secondary)' }}>{loadingMessage}</span>
-            </div>
+          <div className="mt-8">
+            <AnalysisPipeline
+              stages={BOOK_ANALYSIS_STAGES.slice(0, 1)}
+              message={loadingMessage}
+            />
           </div>
         )}
 

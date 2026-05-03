@@ -29,10 +29,18 @@ export interface ExtractedCharacter {
   isMain: boolean;
   suggestedGender: VoiceGender | 'neutral';
   suggestedTone: SuggestedTone;
+  styleHint?: string;
+}
+
+export interface SeriesInfo {
+  name: string;
+  index?: number;
+  confidence?: 'high' | 'medium' | 'low';
 }
 
 export interface ExtractedCharacters {
   characters: ExtractedCharacter[];
+  series?: SeriesInfo;
 }
 
 export interface VoiceSlot {
@@ -46,17 +54,28 @@ export interface CharacterCasting {
   isMain: boolean;
   voice: VoiceSlot;
   color: string;
+  suggestedGender?: VoiceGender | 'neutral';
 }
 
 export interface BookCasting {
   bookId: string;
   narrator: VoiceSlot;
   characters: CharacterCasting[];
+  series?: SeriesInfo;
   updatedAt: string;
 }
 
 export interface ParsedBookRecord extends ParsedFB2 {
   bookId: string;
+  series?: SeriesInfo;
+}
+
+export interface SeriesPriorCharacter {
+  name: string;
+  description: string;
+  voiceId: string;
+  styleHint: string;
+  fromBookTitle: string;
 }
 
 export const NARRATOR_KEY = 'Рассказчик';

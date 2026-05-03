@@ -99,7 +99,17 @@ export async function deleteBook(bookId: string): Promise<void> {
 
 export async function saveParsedBook(bookId: string, parsed: ParsedFB2): Promise<void> {
   const db = await openDB();
-  const record: ParsedBookRecord = { bookId, ...parsed };
+  const existing = await new Promise<ParsedBookRecord | null>((resolve, reject) => {
+    const tx = db.transaction(PARSED_BOOKS_STORE, 'readonly');
+    const request = tx.objectStore(PARSED_BOOKS_STORE).get(bookId);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+  const record: ParsedBookRecord = {
+    bookId,
+    ...parsed,
+    series: existing?.series,
+  };
   const tx = db.transaction(PARSED_BOOKS_STORE, 'readwrite');
   tx.objectStore(PARSED_BOOKS_STORE).put(record);
   return new Promise((resolve, reject) => {
@@ -115,6 +125,37 @@ export async function getParsedBook(bookId: string): Promise<ParsedBookRecord | 
     const request = tx.objectStore(PARSED_BOOKS_STORE).get(bookId);
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAllParsedBooks(): Promise<ParsedBookRecord[]> {
+  const db = await openDB();
+  const tx = db.transaction(PARSED_BOOKS_STORE, 'readonly');
+  return new Promise((resolve, reject) => {
+    const request = tx.objectStore(PARSED_BOOKS_STORE).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function updateParsedBookSeries(
+  bookId: string,
+  series: ParsedBookRecord['series'],
+): Promise<void> {
+  const db = await openDB();
+  const existing = await new Promise<ParsedBookRecord | null>((resolve, reject) => {
+    const tx = db.transaction(PARSED_BOOKS_STORE, 'readonly');
+    const request = tx.objectStore(PARSED_BOOKS_STORE).get(bookId);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+  if (!existing) return;
+  const next: ParsedBookRecord = { ...existing, series };
+  const tx = db.transaction(PARSED_BOOKS_STORE, 'readwrite');
+  tx.objectStore(PARSED_BOOKS_STORE).put(next);
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
