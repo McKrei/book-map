@@ -5,7 +5,7 @@ import { parseFB2 } from '../../lib/fb2Parser';
 import { analyzeBook, isAIConfigured } from '../../lib/aiService';
 import { buildMapFromAnalysis } from '../../lib/mapBuilder';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
-import { saveBook as saveBookToDb } from '../../lib/db';
+import { saveBook as saveBookToDb, saveParsedBook } from '../../lib/db';
 import { useBookStore } from '../../store/bookStore';
 import type { ParsedFB2, AIAnalysisResult } from '../../types';
 
@@ -67,6 +67,7 @@ export function UploadPage() {
       };
 
       try { await saveBookToDb(book, analysisResult); } catch (e) { console.warn('IndexedDB save failed:', e); }
+      try { await saveParsedBook(book.id, parsedBook); } catch (e) { console.warn('IndexedDB save (parsedBook) failed:', e); }
 
       if (isSupabaseConfigured()) {
         try {
