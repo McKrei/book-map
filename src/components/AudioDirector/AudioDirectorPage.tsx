@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Mic, Sparkles, AlertCircle, ArrowLeft, Settings, Save, RefreshCw, BookMarked } from 'lucide-react';
-import { getParsedBook, getCasting, saveCasting } from '../../lib/db';
+import { Mic, Sparkles, AlertCircle, ArrowLeft, Settings, Save, RefreshCw, BookMarked, ListOrdered, ChevronRight } from 'lucide-react';
+import { getParsedBook, getCasting, saveCasting, getChapterScriptsByBook } from '../../lib/db';
 import { extractCharacters, mergeCasting } from '../../lib/audioDirector';
 import { isGeminiConfigured, isGeminiQuotaError, isGeminiAuthError } from '../../lib/geminiClient';
 import { useAudioStore } from '../../store/audioStore';
@@ -29,6 +29,7 @@ export function AudioDirectorPage() {
   const [parsedBook, setParsedBook] = useState<ParsedFB2 | null>(null);
   const [bookMissing, setBookMissing] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [scriptsByOrder, setScriptsByOrder] = useState<Map<number, number>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const saveDebounceRef = useRef<number | null>(null);
 
@@ -45,9 +46,10 @@ export function AudioDirectorPage() {
     async function load() {
       if (!bookId) return;
       try {
-        const [book, existingCasting] = await Promise.all([
+        const [book, existingCasting, scripts] = await Promise.all([
           getParsedBook(bookId),
           getCasting(bookId),
+          getChapterScriptsByBook(bookId),
         ]);
         if (cancelled) return;
         if (!book) {
@@ -56,6 +58,9 @@ export function AudioDirectorPage() {
         }
         setParsedBook(book);
         setCasting(existingCasting);
+        const map = new Map<number, number>();
+        for (const s of scripts) map.set(s.chapterOrder, s.blocks.length);
+        setScriptsByOrder(map);
       } catch (err) {
         console.error('Failed to load AudioDirector data', err);
       }
@@ -341,19 +346,74 @@ export function AudioDirectorPage() {
               }
             />
 
-            <div
-              className="mt-6 rounded-2xl p-4 text-[12px]"
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                Что дальше?
-              </span>{' '}
-              В следующих PR появится разметка глав на блоки реплик и генерация аудио. Сейчас кастинг сохраняется и будет использован автоматически.
-            </div>
+            {parsedBook && parsedBook.chapters.length > 0 && (
+              <div className="mt-8">
+                <h2
+                  className="text-base font-bold mb-1 inline-flex items-center gap-2"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  <ListOrdered size={16} style={{ color: 'var(--neon-purple)' }} />
+                  Главы для разметки и озвучки
+                </h2>
+                <p className="text-[12px] mb-4" style={{ color: 'var(--text-muted)' }}>
+                  Откройте главу, чтобы получить разметку реплик от Gemini и подготовить её к озвучке.
+                </p>
+                <div className="grid gap-2">
+                  {parsedBook.chapters.map((ch) => {
+                    const blockCount = scriptsByOrder.get(ch.order);
+                    return (
+                      <Link
+                        key={ch.order}
+                        to={`/audio/${bookId}/chapter/${ch.order}`}
+                        className="rounded-xl p-3 flex items-center gap-3 transition-colors hover:bg-white/5"
+                        style={{
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        <span
+                          className="text-[12px] font-mono w-8 text-center shrink-0"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {ch.order}
+                        </span>
+                        <span
+                          className="text-[13px] flex-1 truncate"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {ch.title || 'Без названия'}
+                        </span>
+                        <span className="text-[11px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          {ch.text.length.toLocaleString('ru-RU')} симв.
+                        </span>
+                        {blockCount !== undefined && blockCount > 0 ? (
+                          <span
+                            className="text-[11px] rounded-full px-2 py-0.5"
+                            style={{
+                              background: 'rgba(52, 211, 153, 0.12)',
+                              color: 'var(--neon-green)',
+                            }}
+                          >
+                            {blockCount} блоков
+                          </span>
+                        ) : (
+                          <span
+                            className="text-[11px] rounded-full px-2 py-0.5"
+                            style={{
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            не размечена
+                          </span>
+                        )}
+                        <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
