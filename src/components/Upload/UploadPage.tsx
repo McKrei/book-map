@@ -123,7 +123,7 @@ export function UploadPage() {
           >
             <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
             <p className="text-[13px]" style={{ color: '#fbbf24' }}>
-              OpenRouter API ключ не настроен. Нажмите <strong>&#9881;</strong> в шапке, чтобы добавить.
+              Gemini API ключ не настроен. Нажмите <strong>&#9881;</strong> в шапке, чтобы добавить.
             </p>
           </div>
         )}

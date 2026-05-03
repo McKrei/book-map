@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { X, Key, ExternalLink, CheckCircle, Mic } from 'lucide-react';
-import { setApiKey, isAIConfigured } from '../../lib/aiService';
+import { X, ExternalLink, CheckCircle, Mic } from 'lucide-react';
 import {
   setGeminiApiKey,
   isGeminiConfigured,
@@ -18,9 +17,6 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const [openrouterKey, setOpenrouterKey] = useState(
-    localStorage.getItem('openrouter_api_key') || '',
-  );
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [proModel, setProModelLocal] = useState(getProModel());
   const [flashModel, setFlashModelLocal] = useState(getFlashModel());
@@ -29,7 +25,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen) return null;
 
   const handleSave = () => {
-    setApiKey(openrouterKey);
     setGeminiApiKey(geminiKey);
     setProModel(proModel);
     setFlashModel(flashModel);
@@ -76,44 +71,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             className="flex items-center gap-2 text-sm font-medium mb-2"
             style={{ color: 'var(--text-secondary)' }}
           >
-            <Key size={14} style={{ color: 'var(--neon-purple)' }} />
-            OpenRouter API ключ
-          </label>
-          <input
-            type="password"
-            value={openrouterKey}
-            onChange={(e) => setOpenrouterKey(e.target.value)}
-            placeholder="sk-or-v1-..."
-            className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none transition-all duration-200"
-            style={inputStyle}
-          />
-          <p
-            className="text-[12px] mt-2 flex items-center gap-1"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Используется для построения карты сюжета. Получите ключ на{' '}
-            <a
-              href="https://openrouter.ai/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 hover:underline"
-              style={{ color: 'var(--neon-purple)' }}
-            >
-              openrouter.ai <ExternalLink size={10} />
-            </a>
-          </p>
-        </div>
-
-        <div
-          className="mb-5 pt-5"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
-          <label
-            className="flex items-center gap-2 text-sm font-medium mb-2"
-            style={{ color: 'var(--text-secondary)' }}
-          >
             <Mic size={14} style={{ color: 'var(--neon-cyan)' }} />
-            Gemini API ключ (Audio Director)
+            Gemini API ключ
           </label>
           <input
             type="password"
@@ -124,10 +83,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             style={inputStyle}
           />
           <p
-            className="text-[12px] mt-2 flex items-center gap-1"
+            className="text-[12px] mt-2 flex items-center gap-1 flex-wrap"
             style={{ color: 'var(--text-muted)' }}
           >
-            Используется для аудио-директора (анализ персонажей, разметка глав, TTS). Получите ключ на{' '}
+            Используется для анализа книги, кастинга и TTS. Получите ключ на{' '}
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -184,28 +143,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex flex-col gap-1 text-[12px] font-medium">
-            <span className="flex items-center gap-1.5">
-              {isAIConfigured() ? (
-                <>
-                  <CheckCircle size={13} style={{ color: 'var(--neon-green)' }} />
-                  <span style={{ color: 'var(--neon-green)' }}>OpenRouter настроен</span>
-                </>
-              ) : (
-                <span style={{ color: '#fbbf24' }}>OpenRouter не настроен</span>
-              )}
-            </span>
-            <span className="flex items-center gap-1.5">
-              {isGeminiConfigured() ? (
-                <>
-                  <CheckCircle size={13} style={{ color: 'var(--neon-green)' }} />
-                  <span style={{ color: 'var(--neon-green)' }}>Gemini настроен</span>
-                </>
-              ) : (
-                <span style={{ color: '#fbbf24' }}>Gemini не настроен</span>
-              )}
-            </span>
-          </div>
+          <span className="flex items-center gap-1.5 text-[12px] font-medium">
+            {isGeminiConfigured() ? (
+              <>
+                <CheckCircle size={13} style={{ color: 'var(--neon-green)' }} />
+                <span style={{ color: 'var(--neon-green)' }}>Gemini настроен</span>
+              </>
+            ) : (
+              <span style={{ color: '#fbbf24' }}>Gemini не настроен</span>
+            )}
+          </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
