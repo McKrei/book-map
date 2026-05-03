@@ -12,6 +12,7 @@
 - 👤 **Персонажи** — карточки с описанием и цветовой кодировкой
 - ⚡ **События** — последовательность ключевых сюжетных событий по главам
 - 🔄 **Изменения персонажей** — отслеживание развития, трансформаций, откровений
+- 🎙️ **Audio Director** — экстракция действующих лиц через Gemini 3.1 Pro и кастинг голосов TTS (см. [`docs/audio-director/`](docs/audio-director/README.md))
 - 💾 **Supabase** — сохранение данных в облачную БД
 
 ## Быстрый старт
@@ -36,7 +37,10 @@ cp .env.example .env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_OPENROUTER_API_KEY=your-openrouter-api-key
+VITE_GEMINI_API_KEY=your-google-ai-studio-key
 ```
+
+> Все ключи можно ввести и через интерфейс Settings (шестерёнка в шапке) — они попадут в `localStorage`.
 
 ### 3. Настройка Supabase
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, ChevronRight, Library } from 'lucide-react';
+import { BookOpen, ChevronRight, Library, Mic } from 'lucide-react';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getAllBooks } from '../../lib/db';
 import { useBookStore } from '../../store/bookStore';
@@ -75,44 +75,65 @@ export function BookList() {
         ) : (
           <div className="grid gap-3">
             {books.map((book) => (
-              <Link
+              <div
                 key={book.id}
-                to={`/map/${book.id}`}
-                className="neon-border rounded-2xl p-5 transition-all duration-200 group flex items-center justify-between"
+                className="neon-border rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap"
                 style={{ background: 'var(--bg-card)' }}
               >
-                <div className="flex items-center gap-4">
+                <Link
+                  to={`/map/${book.id}`}
+                  className="flex items-center gap-4 flex-1 min-w-0 group"
+                >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(167, 139, 250, 0.1)' }}
                   >
                     <BookOpen size={18} style={{ color: 'var(--neon-purple)' }} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3
-                      className="font-semibold text-base transition-colors duration-200"
+                      className="font-semibold text-base transition-colors duration-200 truncate"
                       style={{ color: 'var(--text-primary)' }}
                     >
                       {book.title}
                     </h3>
                     {book.author && (
-                      <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      <p
+                        className="text-sm mt-0.5 truncate"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
                         {book.author}
                       </p>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
+                </Link>
+                <div className="flex items-center gap-2">
                   <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     {new Date(book.created_at).toLocaleDateString('ru-RU')}
                   </span>
-                  <ChevronRight
-                    size={16}
-                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  <Link
+                    to={`/audio/${book.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl transition-all duration-200"
+                    style={{
+                      background: 'rgba(34, 211, 238, 0.1)',
+                      color: 'var(--neon-cyan)',
+                      border: '1px solid rgba(34, 211, 238, 0.2)',
+                    }}
+                    title="Audio Director"
+                  >
+                    <Mic size={14} />
+                    Озвучить
+                  </Link>
+                  <Link
+                    to={`/map/${book.id}`}
+                    className="p-2 rounded-xl transition-colors"
                     style={{ color: 'var(--text-muted)' }}
-                  />
+                    title="Карта сюжета"
+                  >
+                    <ChevronRight size={16} />
+                  </Link>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

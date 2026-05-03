@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { Mic } from 'lucide-react';
 import { useBookStore } from '../store/bookStore';
 import { BookMap } from '../components/BookMap/BookMap';
 import { getBookAnalysis, getAllBooks } from '../lib/db';
@@ -41,6 +42,7 @@ export function MapPage() {
 
     loadFromDb();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (isLoading) {
@@ -67,10 +69,27 @@ export function MapPage() {
   }
 
   return (
-    <BookMap
-      initialNodes={nodes}
-      initialEdges={edges}
-      bookTitle={currentBook?.title}
-    />
+    <div className="relative h-full">
+      <BookMap
+        initialNodes={nodes}
+        initialEdges={edges}
+        bookTitle={currentBook?.title}
+      />
+      {id && (
+        <Link
+          to={`/audio/${id}`}
+          className="absolute top-4 right-4 z-10 inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 backdrop-blur-md"
+          style={{
+            background: 'linear-gradient(135deg, var(--neon-cyan), var(--neon-blue))',
+            color: '#fff',
+            boxShadow: 'var(--glow-cyan)',
+          }}
+          title="Открыть Audio Director"
+        >
+          <Mic size={15} />
+          Озвучить
+        </Link>
+      )}
+    </div>
   );
 }
