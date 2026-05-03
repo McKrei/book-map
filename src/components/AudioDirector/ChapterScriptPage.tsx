@@ -23,6 +23,7 @@ import { isGeminiConfigured, isGeminiQuotaError, isGeminiAuthError } from '../..
 import { useScriptStore } from '../../store/scriptStore';
 import { ScriptBlockCard } from './ScriptBlockCard';
 import { speakerVisualsForCasting } from './speakerColors';
+import { ChapterAudioPanel } from './ChapterAudioPanel';
 import { AnalysisPipeline } from '../Pipeline/AnalysisPipeline';
 import type { PipelineStage } from '../Pipeline/AnalysisPipeline';
 import { Sparkles as SparklesIcon, FileText, Users, Mic } from 'lucide-react';
@@ -455,6 +456,16 @@ export function ChapterScriptPage() {
               >
                 <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
                 <p className="text-[13px]" style={{ color: '#ef4444' }}>{markupError}</p>
+              </div>
+            )}
+
+            {script && casting && (
+              <div className="mb-6">
+                <ChapterAudioPanel
+                  script={script}
+                  casting={casting}
+                  onScriptUpdate={setScript}
+                />
               </div>
             )}
 
