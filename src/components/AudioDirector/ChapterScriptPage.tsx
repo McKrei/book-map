@@ -26,8 +26,10 @@ import { speakerVisualsForCasting } from './speakerColors';
 import { ChapterAudioPanel } from './ChapterAudioPanel';
 import { AnalysisPipeline } from '../Pipeline/AnalysisPipeline';
 import type { PipelineStage } from '../Pipeline/AnalysisPipeline';
-import { Sparkles as SparklesIcon, FileText, Users, Mic } from 'lucide-react';
+import { Sparkles as SparklesIcon, FileText, Users, Mic, X as XIcon } from 'lucide-react';
 import { createElement } from 'react';
+import { runTtsQueue } from '../../lib/ttsQueue';
+import { getBlockAudioWav } from '../../lib/chapterAudioBuilder';
 import type { BookCasting } from '../../types/audio';
 import type { ParsedFB2 } from '../../types';
 
@@ -84,14 +86,44 @@ export function ChapterScriptPage() {
   const [chapterScripts, setChapterScripts] = useState<{ chapterOrder: number; blockCount: number }[]>([]);
   const [bookMissing, setBookMissing] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [playingBlockId, setPlayingBlockId] = useState<string | null>(null);
+  const [blockGenError, setBlockGenError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const blockGenAbortRef = useRef<AbortController | null>(null);
+  const blockAudioRef = useRef<HTMLAudioElement | null>(null);
+  const blockAudioUrlRef = useRef<string | null>(null);
   const saveDebounceRef = useRef<number | null>(null);
+
+  const chapterKey = `${bookId}:${chapterOrder}`;
+  const [prevChapterKey, setPrevChapterKey] = useState(chapterKey);
+  if (chapterKey !== prevChapterKey) {
+    setPrevChapterKey(chapterKey);
+    setSelectedIds(new Set());
+    setPlayingBlockId(null);
+    setBlockGenError(null);
+  }
 
   useEffect(() => {
     setKey(bookId, chapterOrder);
+    const audioEl = blockAudioRef.current;
+    const urlRef = blockAudioUrlRef;
+    if (audioEl) {
+      audioEl.pause();
+      audioEl.removeAttribute('src');
+    }
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
     return () => {
       abortRef.current?.abort();
+      blockGenAbortRef.current?.abort();
       if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      }
     };
   }, [bookId, chapterOrder, setKey]);
 
@@ -207,6 +239,108 @@ export function ChapterScriptPage() {
     },
     [navigate, bookId],
   );
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const stopBlockPlayback = useCallback(() => {
+    if (blockAudioRef.current) {
+      blockAudioRef.current.pause();
+      blockAudioRef.current.removeAttribute('src');
+    }
+    if (blockAudioUrlRef.current) {
+      URL.revokeObjectURL(blockAudioUrlRef.current);
+      blockAudioUrlRef.current = null;
+    }
+    setPlayingBlockId(null);
+  }, []);
+
+  const playBlock = useCallback(
+    async (blockId: string) => {
+      if (!script) return;
+      const target = script.blocks.find((b) => b.id === blockId);
+      if (!target || target.audioStatus !== 'done' || !target.audioCacheKey) return;
+      if (playingBlockId === blockId && blockAudioRef.current && !blockAudioRef.current.paused) {
+        stopBlockPlayback();
+        return;
+      }
+      try {
+        const audio = blockAudioRef.current;
+        if (!audio) return;
+        audio.pause();
+        if (blockAudioUrlRef.current) {
+          URL.revokeObjectURL(blockAudioUrlRef.current);
+          blockAudioUrlRef.current = null;
+        }
+        const data = await getBlockAudioWav(target.audioCacheKey);
+        if (!data) return;
+        const url = URL.createObjectURL(data.wav);
+        blockAudioUrlRef.current = url;
+        audio.src = url;
+        await audio.play();
+        setPlayingBlockId(blockId);
+      } catch (err) {
+        console.warn('Failed to play block', err);
+        stopBlockPlayback();
+      }
+    },
+    [script, playingBlockId, stopBlockPlayback],
+  );
+
+  const runBlocksGeneration = useCallback(
+    async (blockIds: string[], force: boolean) => {
+      if (!script || !casting || blockIds.length === 0) return;
+      if (!isGeminiConfigured()) {
+        setBlockGenError('Сначала добавьте Gemini API ключ в Settings');
+        return;
+      }
+      blockGenAbortRef.current?.abort();
+      blockGenAbortRef.current = new AbortController();
+      setBlockGenError(null);
+      try {
+        await runTtsQueue({
+          script,
+          casting,
+          parallelism: 3,
+          blockIds,
+          force,
+          signal: blockGenAbortRef.current.signal,
+          onScriptUpdate: (updated) => setScript(updated),
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        let msg = err instanceof Error ? err.message : String(err);
+        if (isGeminiAuthError(err)) msg = 'Gemini отверг ключ. Проверьте API key в Settings.';
+        else if (isGeminiQuotaError(err)) msg = 'Превышена квота Gemini.';
+        setBlockGenError(msg);
+      }
+    },
+    [script, casting, setScript],
+  );
+
+  const generateBlock = useCallback(
+    (blockId: string) => {
+      if (!script) return;
+      const block = script.blocks.find((b) => b.id === blockId);
+      const force = block?.audioStatus === 'done';
+      void runBlocksGeneration([blockId], force);
+    },
+    [script, runBlocksGeneration],
+  );
+
+  const generateSelected = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    void runBlocksGeneration(ids, true);
+  }, [selectedIds, runBlocksGeneration]);
 
   const totalChapters = parsedBook?.chapters.length || 0;
   const prevChapter = chapterOrder > 1 ? chapterOrder - 1 : null;
@@ -469,6 +603,62 @@ export function ChapterScriptPage() {
               </div>
             )}
 
+            {selectedIds.size > 0 && (
+              <div
+                className="sticky top-2 z-20 mb-3 rounded-2xl px-3 py-2 flex items-center gap-2 flex-wrap backdrop-blur-md"
+                style={{
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: '1px solid rgba(167, 139, 250, 0.4)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+                }}
+              >
+                <span className="text-[12px] font-semibold" style={{ color: 'var(--neon-purple)' }}>
+                  Выбрано: {selectedIds.size}
+                </span>
+                <div className="flex-1" />
+                <button
+                  onClick={generateSelected}
+                  disabled={!isGeminiConfigured() || !casting}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium rounded-lg px-2.5 py-1.5 disabled:opacity-40"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neon-purple), var(--neon-blue))',
+                    color: '#fff',
+                  }}
+                >
+                  <Mic size={13} />
+                  Озвучить выбранные
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="inline-flex items-center gap-1 text-[12px] rounded-lg px-2 py-1.5"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                >
+                  <XIcon size={12} />
+                  Сброс
+                </button>
+              </div>
+            )}
+
+            {blockGenError && (
+              <div
+                className="rounded-2xl p-3 mb-3 flex items-start gap-2"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                }}
+              >
+                <AlertCircle size={14} className="shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                <p className="text-[12px] flex-1" style={{ color: '#ef4444' }}>{blockGenError}</p>
+                <button
+                  onClick={() => setBlockGenError(null)}
+                  className="text-[12px] rounded p-0.5 hover:bg-white/10"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <XIcon size={12} />
+                </button>
+              </div>
+            )}
+
             {script && (
               <div className="space-y-2.5">
                 {script.blocks.map((block) => (
@@ -477,6 +667,11 @@ export function ChapterScriptPage() {
                     block={block}
                     visuals={visuals}
                     casting={casting}
+                    selected={selectedIds.has(block.id)}
+                    onToggleSelect={() => toggleSelected(block.id)}
+                    isPlaying={playingBlockId === block.id}
+                    onTogglePlay={() => playBlock(block.id)}
+                    onGenerate={() => generateBlock(block.id)}
                     onChangeSpeaker={(speaker) => updateBlock(block.id, { speaker })}
                     onChangeText={(text) =>
                       updateBlock(block.id, {
@@ -491,6 +686,15 @@ export function ChapterScriptPage() {
                 ))}
               </div>
             )}
+
+            <audio
+              ref={blockAudioRef}
+              onEnded={stopBlockPlayback}
+              onPause={() => {
+                if (blockAudioRef.current && blockAudioRef.current.ended) return;
+              }}
+              className="hidden"
+            />
           </div>
         </main>
       </div>

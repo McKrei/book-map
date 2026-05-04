@@ -21,6 +21,8 @@ export interface RunQueueOptions {
   signal?: AbortSignal;
   onProgress?: (progress: QueueProgress, script: ChapterScript) => void;
   onScriptUpdate?: (script: ChapterScript) => void;
+  blockIds?: string[];
+  force?: boolean;
 }
 
 interface QueueState {
@@ -61,9 +63,10 @@ async function processOneBlock(
   casting: BookCasting,
   signal: AbortSignal | undefined,
   onChange: () => void,
+  force: boolean,
 ): Promise<void> {
   const block = state.script.blocks[blockIdx];
-  if (block.audioStatus === 'done' && block.audioCacheKey) {
+  if (!force && block.audioStatus === 'done' && block.audioCacheKey) {
     const existing = await getAudioCacheEntry(block.audioCacheKey);
     if (existing) return;
   }
@@ -142,15 +145,29 @@ async function processOneBlock(
 }
 
 export async function runTtsQueue(opts: RunQueueOptions): Promise<ChapterScript> {
-  const { casting, parallelism = 3, signal, onProgress, onScriptUpdate } = opts;
+  const {
+    casting,
+    parallelism = 3,
+    signal,
+    onProgress,
+    onScriptUpdate,
+    blockIds,
+    force = false,
+  } = opts;
   const state: QueueState = {
     script: clone(opts.script),
     progress: progressFromBlocks(opts.script.blocks, 0),
   };
 
+  const filterSet = blockIds && blockIds.length > 0 ? new Set(blockIds) : null;
   const indices: number[] = [];
   for (let i = 0; i < state.script.blocks.length; i++) {
-    if (state.script.blocks[i].audioStatus !== 'done') indices.push(i);
+    const b = state.script.blocks[i];
+    if (filterSet) {
+      if (filterSet.has(b.id)) indices.push(i);
+      continue;
+    }
+    if (force || b.audioStatus !== 'done') indices.push(i);
   }
 
   let next = 0;
@@ -180,7 +197,7 @@ export async function runTtsQueue(opts: RunQueueOptions): Promise<ChapterScript>
       const blockIdx = indices[i];
       state.progress.currentBlockId = state.script.blocks[blockIdx].id;
       try {
-        await processOneBlock(state, blockIdx, casting, signal, onChange);
+        await processOneBlock(state, blockIdx, casting, signal, onChange, force);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true;
