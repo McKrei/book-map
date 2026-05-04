@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Trash2, Edit3, Check, X, ChevronDown } from 'lucide-react';
+import {
+  Trash2,
+  Edit3,
+  Check,
+  X,
+  ChevronDown,
+  Mic,
+  RefreshCw,
+  Play,
+  Pause,
+  Loader2,
+} from 'lucide-react';
 import type { ScriptBlock } from '../../types/script';
 import type { BookCasting } from '../../types/audio';
 import { NARRATOR_SPEAKER } from '../../types/script';
@@ -9,6 +20,11 @@ interface Props {
   block: ScriptBlock;
   visuals: Record<string, SpeakerVisual>;
   casting: BookCasting | null;
+  selected: boolean;
+  onToggleSelect: () => void;
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  onGenerate: () => void;
   onChangeSpeaker: (speaker: string) => void;
   onChangeText: (text: string) => void;
   onChangeEmotion: (emotion: string) => void;
@@ -19,6 +35,11 @@ export function ScriptBlockCard({
   block,
   visuals,
   casting,
+  selected,
+  onToggleSelect,
+  isPlaying,
+  onTogglePlay,
+  onGenerate,
   onChangeSpeaker,
   onChangeText,
   onChangeEmotion,
@@ -47,15 +68,30 @@ export function ScriptBlockCard({
     ...((casting?.characters ?? []).map((c) => c.name)),
   ];
 
+  const isDone = block.audioStatus === 'done';
+  const isGenerating = block.audioStatus === 'generating';
+
   return (
     <div
       className="rounded-2xl p-3 transition-colors duration-200"
       style={{
         background: visual.background,
-        border: `1px solid ${visual.border}`,
+        border: `1px solid ${selected ? visual.color : visual.border}`,
+        boxShadow: selected ? `0 0 0 1px ${visual.color}` : undefined,
       }}
     >
       <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <button
+          onClick={onToggleSelect}
+          className="shrink-0 w-4 h-4 rounded-[4px] flex items-center justify-center transition-colors"
+          style={{
+            background: selected ? visual.color : 'transparent',
+            border: `1px solid ${selected ? visual.color : 'var(--border)'}`,
+          }}
+          title={selected ? 'Убрать из выделения' : 'Выделить блок'}
+        >
+          {selected && <Check size={11} style={{ color: '#0a0a14' }} strokeWidth={3} />}
+        </button>
         <div className="relative">
           <button
             onClick={() => setSpeakerOpen((v) => !v)}
@@ -144,6 +180,35 @@ export function ScriptBlockCard({
         <div className="flex-1" />
 
         <StatusBadge status={block.audioStatus} />
+
+        {isDone && (
+          <button
+            onClick={onTogglePlay}
+            className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+            title={isPlaying ? 'Пауза' : 'Прослушать блок'}
+            style={{ color: 'var(--neon-cyan)' }}
+          >
+            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+        )}
+
+        <button
+          onClick={onGenerate}
+          disabled={isGenerating}
+          className="p-1.5 rounded-md hover:bg-white/10 transition-colors disabled:opacity-50"
+          title={isDone ? 'Перегенерировать блок' : 'Озвучить блок'}
+          style={{
+            color: isDone ? 'var(--neon-purple)' : 'var(--neon-cyan)',
+          }}
+        >
+          {isGenerating ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : isDone ? (
+            <RefreshCw size={14} />
+          ) : (
+            <Mic size={14} />
+          )}
+        </button>
 
         {!editingText ? (
           <button

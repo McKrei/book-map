@@ -48,3 +48,12 @@ export async function getStoredChapterAudio(
     durationMs: stored.durationMs,
   };
 }
+
+export async function getBlockAudioWav(
+  cacheKey: string,
+): Promise<{ wav: Blob; durationMs: number } | null> {
+  const entry = await getAudioCacheEntry(cacheKey);
+  if (!entry) return null;
+  const { wav, durationMs } = pcmToWav([entry.pcmBytes]);
+  return { wav, durationMs: entry.durationMs || durationMs };
+}
