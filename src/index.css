@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 html, body, #root {
@@ -6,12 +7,73 @@ html, body, #root {
   padding: 0;
 }
 
+/* ── Dark theme (default) ── */
 body {
-  background-color: #0f172a;
-  color: #e2e8f0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+body[data-theme="dark"] {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-card: #1a1f35;
+  --bg-card-hover: #222845;
+  --border: rgba(99, 102, 241, 0.2);
+  --border-accent: rgba(99, 102, 241, 0.5);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --neon-purple: #a78bfa;
+  --neon-blue: #60a5fa;
+  --neon-cyan: #22d3ee;
+  --neon-pink: #f472b6;
+  --neon-green: #34d399;
+  --glow-purple: 0 0 20px rgba(167, 139, 250, 0.3);
+  --glow-blue: 0 0 20px rgba(96, 165, 250, 0.3);
+  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.25);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ── Light theme ── */
+body[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --border: rgba(99, 102, 241, 0.15);
+  --border-accent: rgba(99, 102, 241, 0.4);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --neon-purple: #7c3aed;
+  --neon-blue: #3b82f6;
+  --neon-cyan: #06b6d4;
+  --neon-pink: #ec4899;
+  --neon-green: #10b981;
+  --glow-purple: 0 0 16px rgba(124, 58, 237, 0.15);
+  --glow-blue: 0 0 16px rgba(59, 130, 246, 0.15);
+  --glow-cyan: 0 0 16px rgba(6, 182, 212, 0.12);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ── Neon glow utilities ── */
+.neon-border {
+  border: 1px solid var(--border-accent);
+  box-shadow: var(--glow-purple), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.neon-glow-sm {
+  box-shadow: var(--glow-purple);
+}
+
+.neon-text {
+  color: var(--neon-purple);
+  text-shadow: 0 0 12px rgba(167, 139, 250, 0.4);
+}
+
+/* ── React Flow overrides ── */
 .react-flow__node {
   cursor: grab;
 }
@@ -21,10 +83,60 @@ body {
 }
 
 .react-flow__controls {
-  border-radius: 12px !important;
+  border-radius: 14px !important;
   overflow: hidden;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--glow-purple) !important;
+}
+
+body[data-theme="dark"] .react-flow__controls button {
+  background: #1a1f35 !important;
+  border-color: rgba(99,102,241,0.2) !important;
+  color: #a78bfa !important;
+  fill: #a78bfa !important;
+}
+body[data-theme="dark"] .react-flow__controls button:hover {
+  background: #222845 !important;
+}
+body[data-theme="light"] .react-flow__controls button {
+  background: #fff !important;
+  border-color: rgba(99,102,241,0.15) !important;
+  color: #7c3aed !important;
+  fill: #7c3aed !important;
+}
+body[data-theme="light"] .react-flow__controls button:hover {
+  background: #f1f5f9 !important;
 }
 
 .react-flow__minimap {
-  border-radius: 12px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--glow-blue) !important;
+}
+
+body[data-theme="dark"] .react-flow__minimap {
+  background: #0a0e1a !important;
+}
+body[data-theme="light"] .react-flow__minimap {
+  background: #f1f5f9 !important;
+}
+
+/* ── Edge transitions ── */
+.react-flow__edge path {
+  transition: opacity 0.3s ease, stroke-width 0.3s ease, filter 0.3s ease;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
 }

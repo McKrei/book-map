@@ -1,11 +1,15 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Upload, FileText, BookOpen, Sparkles, AlertCircle } from 'lucide-react';
 import { parseFB2 } from '../../lib/fb2Parser';
 import { analyzeBook, isAIConfigured } from '../../lib/aiService';
 import { buildMapFromAnalysis } from '../../lib/mapBuilder';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { saveBook as saveBookToDb, saveParsedBook } from '../../lib/db';
 import { useBookStore } from '../../store/bookStore';
-import type { ParsedFB2 } from '../../types';
+import { AnalysisPipeline } from '../Pipeline/AnalysisPipeline';
+import { BOOK_ANALYSIS_STAGES } from '../Pipeline/stagePresets';
+import type { ParsedFB2, AIAnalysisResult } from '../../types';
 
 export function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
@@ -16,7 +20,6 @@ export function UploadPage() {
   const handleFile = useCallback(async (file: File) => {
     setError(null);
     setLoading(true, 'Читаю файл...');
-
     try {
       const text = await file.text();
       setLoading(true, 'Парсю FB2...');
@@ -47,15 +50,11 @@ export function UploadPage() {
 
   const handleAnalyze = useCallback(async () => {
     if (!parsedBook) return;
-
     setError(null);
     setLoading(true, 'Анализирую книгу с помощью AI...');
-
     try {
       const analysisResult = await analyzeBook(parsedBook, (msg) => setLoading(true, msg));
-
       setAnalysis(analysisResult);
-
       setLoading(true, 'Строю карту...');
       const mapData = buildMapFromAnalysis(analysisResult);
       setNodes(mapData.nodes);
@@ -69,21 +68,17 @@ export function UploadPage() {
         created_at: new Date().toISOString(),
       };
 
+      try { await saveBookToDb(book, analysisResult); } catch (e) { console.warn('IndexedDB save failed:', e); }
+      try { await saveParsedBook(book.id, parsedBook); } catch (e) { console.warn('IndexedDB save (parsedBook) failed:', e); }
+
       if (isSupabaseConfigured()) {
         try {
-          const { data, error: dbError } = await supabase
-            .from('books')
-            .insert({ title: book.title, author: book.author })
-            .select()
-            .single();
-
+          const { data, error: dbError } = await getSupabase()
+            .from('books').insert({ title: book.title, author: book.author }).select().single();
           if (dbError) throw dbError;
           if (data) book.id = data.id;
-
           await saveAnalysisToDb(book.id, analysisResult);
-        } catch (dbErr) {
-          console.warn('Could not save to Supabase:', dbErr);
-        }
+        } catch (dbErr) { console.warn('Supabase save failed:', dbErr); }
       }
 
       addBook(book);
@@ -97,105 +92,157 @@ export function UploadPage() {
   }, [parsedBook, setError, setLoading, setAnalysis, setNodes, setEdges, addBook, setCurrentBook, navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-8">
+    <div className="min-h-screen flex items-center justify-center p-8" style={{ background: 'var(--bg-primary)' }}>
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-white mb-3">
-            📚 BookMap
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+            style={{
+              background: 'linear-gradient(135deg, var(--neon-purple), var(--neon-blue))',
+              boxShadow: 'var(--glow-purple)',
+            }}
+          >
+            <BookOpen size={28} color="#fff" />
+          </div>
+          <h1
+            className="text-4xl font-extrabold mb-3 tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            BookMap
           </h1>
-          <p className="text-slate-400 text-lg">
+          <p className="text-base" style={{ color: 'var(--text-secondary)' }}>
             Загрузите книгу в формате FB2 и получите интерактивную карту сюжета
           </p>
         </div>
 
         {!isAIConfigured() && (
-          <div className="bg-amber-900/30 border border-amber-500/50 rounded-xl p-4 mb-6">
-            <p className="text-amber-300 text-sm">
-              ⚠️ OpenRouter API ключ не настроен. Добавьте <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-200">VITE_OPENROUTER_API_KEY</code> в файл <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-200">.env</code>
-            </p>
-          </div>
-        )}
-
-        {!isSupabaseConfigured() && (
-          <div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-6">
-            <p className="text-blue-300 text-sm">
-              ℹ️ Supabase не настроен. Данные будут храниться только в текущей сессии. Добавьте <code className="bg-slate-800 px-1.5 py-0.5 rounded text-blue-200">VITE_SUPABASE_URL</code> и <code className="bg-slate-800 px-1.5 py-0.5 rounded text-blue-200">VITE_SUPABASE_ANON_KEY</code> в файл <code className="bg-slate-800 px-1.5 py-0.5 rounded text-blue-200">.env</code>
+          <div
+            className="rounded-xl p-4 mb-6 flex items-start gap-3"
+            style={{
+              background: 'rgba(251, 191, 36, 0.08)',
+              border: '1px solid rgba(251, 191, 36, 0.25)',
+            }}
+          >
+            <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
+            <p className="text-[13px]" style={{ color: '#fbbf24' }}>
+              Gemini API ключ не настроен. Нажмите <strong>&#9881;</strong> в шапке, чтобы добавить.
             </p>
           </div>
         )}
 
         <div
-          className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all cursor-pointer
-            ${isDragging
-              ? 'border-indigo-400 bg-indigo-500/10'
-              : 'border-slate-600 hover:border-slate-500 hover:bg-slate-800/50'
-            }`}
+          className={`rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer ${
+            isDragging ? 'scale-[1.02]' : ''
+          }`}
+          style={{
+            border: isDragging
+              ? '2px dashed var(--neon-purple)'
+              : '2px dashed var(--border)',
+            background: isDragging
+              ? 'rgba(167, 139, 250, 0.06)'
+              : 'var(--bg-card)',
+            boxShadow: isDragging ? 'var(--glow-purple)' : 'none',
+          }}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => document.getElementById('file-input')?.click()}
         >
-          <input
-            id="file-input"
-            type="file"
-            accept=".fb2,.xml"
-            className="hidden"
-            onChange={handleFileInput}
-          />
+          <input id="file-input" type="file" accept=".fb2,.xml" className="hidden" onChange={handleFileInput} />
 
-          <div className="text-5xl mb-4">📖</div>
-          <p className="text-white text-lg mb-2">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
+            style={{
+              background: 'rgba(167, 139, 250, 0.1)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <Upload size={24} style={{ color: 'var(--neon-purple)' }} />
+          </div>
+          <p className="text-base font-medium mb-1.5" style={{ color: 'var(--text-primary)' }}>
             {isDragging ? 'Отпустите файл здесь' : 'Перетащите FB2 файл сюда'}
           </p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             или нажмите, чтобы выбрать файл
           </p>
         </div>
 
         {parsedBook && (
-          <div className="mt-8 bg-slate-800 border border-slate-700 rounded-xl p-6">
-            <h2 className="text-white font-bold text-xl mb-2">{parsedBook.title}</h2>
-            {parsedBook.author && (
-              <p className="text-slate-400 mb-1">Автор: {parsedBook.author}</p>
-            )}
-            <p className="text-slate-500 text-sm mb-4">
-              Глав: {parsedBook.chapters.length}
-            </p>
+          <div
+            className="mt-8 neon-border rounded-2xl p-6"
+            style={{ background: 'var(--bg-card)' }}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(167, 139, 250, 0.12)' }}
+              >
+                <FileText size={18} style={{ color: 'var(--neon-purple)' }} />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
+                  {parsedBook.title}
+                </h2>
+                {parsedBook.author && (
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{parsedBook.author}</p>
+                )}
+              </div>
+            </div>
 
-            <div className="mb-4 max-h-40 overflow-y-auto">
+            <div
+              className="mb-4 max-h-40 overflow-y-auto rounded-xl p-3"
+              style={{ background: 'var(--bg-secondary)' }}
+            >
               {parsedBook.chapters.map((ch, i) => (
-                <div key={i} className="flex items-center gap-2 py-1 text-sm">
-                  <span className="text-indigo-400 font-mono w-6">{ch.order}</span>
-                  <span className="text-slate-300">{ch.title}</span>
-                  <span className="text-slate-600 text-xs ml-auto">
+                <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
+                  <span className="font-mono w-6 text-center" style={{ color: 'var(--neon-purple)' }}>{ch.order}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{ch.title}</span>
+                  <span className="text-[11px] ml-auto" style={{ color: 'var(--text-muted)' }}>
                     {ch.text.length} символов
                   </span>
                 </div>
               ))}
             </div>
 
-            <button
-              onClick={handleAnalyze}
-              disabled={isLoading || !isAIConfigured()}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors"
-            >
-              {isLoading ? loadingMessage : '🔍 Анализировать книгу'}
-            </button>
+            {isLoading ? (
+              <AnalysisPipeline stages={BOOK_ANALYSIS_STAGES} message={loadingMessage} />
+            ) : (
+              <button
+                onClick={handleAnalyze}
+                disabled={!isAIConfigured()}
+                className="w-full font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neon-purple), var(--neon-blue))',
+                  color: '#fff',
+                  boxShadow: 'var(--glow-purple)',
+                }}
+              >
+                <Sparkles size={16} />
+                Анализировать книгу
+              </button>
+            )}
           </div>
         )}
 
         {isLoading && !parsedBook && (
-          <div className="mt-8 text-center">
-            <div className="inline-flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl px-6 py-4">
-              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-slate-300">{loadingMessage}</span>
-            </div>
+          <div className="mt-8">
+            <AnalysisPipeline
+              stages={BOOK_ANALYSIS_STAGES.slice(0, 1)}
+              message={loadingMessage}
+            />
           </div>
         )}
 
         {error && (
-          <div className="mt-6 bg-red-900/30 border border-red-500/50 rounded-xl p-4">
-            <p className="text-red-300 text-sm">❌ {error}</p>
+          <div
+            className="mt-6 rounded-xl p-4 flex items-start gap-3"
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+            }}
+          >
+            <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+            <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>
           </div>
         )}
       </div>
@@ -203,65 +250,33 @@ export function UploadPage() {
   );
 }
 
-async function saveAnalysisToDb(bookId: string, analysis: import('../../types').AIAnalysisResult) {
+async function saveAnalysisToDb(bookId: string, analysis: AIAnalysisResult) {
+  const supabase = getSupabase();
   for (const chapter of analysis.chapters) {
     const { data: chapterData } = await supabase
       .from('chapters')
-      .insert({
-        book_id: bookId,
-        order_index: chapter.order,
-        title: chapter.title,
-        summary: chapter.summary,
-      })
-      .select()
-      .single();
-
+      .insert({ book_id: bookId, order_index: chapter.order, title: chapter.title, summary: chapter.summary })
+      .select().single();
     if (!chapterData) continue;
 
     for (let i = 0; i < chapter.events.length; i++) {
       const event = chapter.events[i];
       const { data: eventData } = await supabase
         .from('plot_events')
-        .insert({
-          book_id: bookId,
-          chapter_id: chapterData.id,
-          order_index: i,
-          title: event.title,
-          description: event.description,
-          event_type: event.event_type,
-        })
-        .select()
-        .single();
-
+        .insert({ book_id: bookId, chapter_id: chapterData.id, order_index: i, title: event.title, description: event.description, event_type: event.event_type })
+        .select().single();
       if (!eventData) continue;
 
       for (const change of event.character_changes) {
-        const { data: charData } = await supabase
-          .from('characters')
-          .select('id')
-          .eq('book_id', bookId)
-          .eq('name', change.character_name)
-          .single();
-
+        const { data: charData } = await supabase.from('characters').select('id').eq('book_id', bookId).eq('name', change.character_name).single();
         if (charData) {
-          await supabase.from('character_events').insert({
-            character_id: charData.id,
-            event_id: eventData.id,
-            change_description: change.change_description,
-            change_type: change.change_type,
-          });
+          await supabase.from('character_events').insert({ character_id: charData.id, event_id: eventData.id, change_description: change.change_description, change_type: change.change_type });
         }
       }
     }
   }
 
   for (const char of analysis.characters) {
-    await supabase.from('characters').insert({
-      book_id: bookId,
-      name: char.name,
-      description: char.description,
-      first_appearance_chapter: char.first_appearance_chapter,
-      color: char.color,
-    });
+    await supabase.from('characters').insert({ book_id: bookId, name: char.name, description: char.description, first_appearance_chapter: char.first_appearance_chapter, color: char.color });
   }
 }
